@@ -29,7 +29,7 @@ Sistema para administrar bibliotecas con control de usuarios, libros, préstamos
   - Tasa de disponibilidad general
   - Estado actual de todos los libros
 
-## Tecnologías Utilizadas 🛠️
+## Tecnologías Utilizadas 
 
 - **Backend**:
   - Python 3.8+
@@ -40,4 +40,3 @@ Sistema para administrar bibliotecas con control de usuarios, libros, préstamos
   - Tkinter (Interfaz gráfica)
   - Matplotlib (Gráficos estadísticos)
 
-## Estructura del Proyecto 📂
