@@ -3,6 +3,9 @@ from tkinter import messagebox, simpledialog
 from usuarios import insertar_usuario, obtener_usuarios, actualizar_usuario, eliminar_usuario
 from libros import insertar_libro, obtener_libros, actualizar_libro, eliminar_libro, verificar_disponibilidad
 from transacciones import registrar_prestamo, registrar_devolucion, obtener_estatus_libros
+from estadisticas import obtener_estadisticas
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 class BibliotecaApp:
     def __init__(self, root):
@@ -233,24 +236,214 @@ class BibliotecaApp:
 
     def mostrar_reportes(self):
         ventana = tk.Toplevel(self.root)
-        ventana.title("Reportes")
-        ventana.geometry("600x400")
+        ventana.title("Reportes Complejos")
+        ventana.geometry("1100x800")
+        ventana.configure(bg='#f0f0f0')
 
-        # Lista de estatus de libros
-        tk.Label(ventana, text="Estatus de Libros", font=("Arial", 12)).pack(pady=5)
+        # Frame principal con pestañas manuales
+        frame_pestanas = tk.Frame(ventana, bg='#f0f0f0')
+        frame_pestanas.pack(pady=10)
+
+        # Botones de pestañas
+        btn_estado = tk.Button(frame_pestanas, text="Estado de Libros", width=20,
+                            command=lambda: mostrar_pestana(0), relief='sunken')
+        btn_estado.grid(row=0, column=0, padx=5)
+
+        btn_estadisticas = tk.Button(frame_pestanas, text="Estadísticas", width=20,
+                                command=lambda: mostrar_pestana(1))
+        btn_estadisticas.grid(row=0, column=1, padx=5)
+
+        # Contenedor de contenido
+        frame_contenido = tk.Frame(ventana, bg='white', bd=2, relief='groove')
+        frame_contenido.pack(fill='both', expand=True, padx=10, pady=(0,10))
+
+        # Frame para estado de libros
+        frame_estado = tk.Frame(frame_contenido, bg='white')
+        frame_estado.pack(fill='both', expand=True)
+
+        # Frame para estadísticas
+        frame_stats = tk.Frame(frame_contenido, bg='white')
         
-        lista_frame = tk.Frame(ventana)
-        lista_frame.pack(fill=tk.BOTH, expand=True)
+        # Lista para almacenar widgets de matplotlib
+        figuras = []
+
+        def mostrar_pestana(index):
+            # Ocultar todas las pestañas
+            frame_estado.pack_forget()
+            frame_stats.pack_forget()
+            
+            # Resetear botones
+            btn_estado.config(relief='raised')
+            btn_estadisticas.config(relief='raised')
+            
+            # Mostrar pestaña seleccionada
+            if index == 0:
+                btn_estado.config(relief='sunken')
+                frame_estado.pack(fill='both', expand=True)
+                cargar_estado_libros()
+            else:
+                btn_estadisticas.config(relief='sunken')
+                frame_stats.pack(fill='both', expand=True)
+                cargar_estadisticas()
+
+        def cargar_estado_libros():
+            # Limpiar frame
+            for widget in frame_estado.winfo_children():
+                widget.destroy()
+            
+            # Frame con scroll
+            canvas = tk.Canvas(frame_estado, bg='white')
+            scrollbar = tk.Scrollbar(frame_estado, orient='vertical', command=canvas.yview)
+            scrollable_frame = tk.Frame(canvas, bg='white')
+            
+            scrollable_frame.bind(
+                "<Configure>",
+                lambda e: canvas.configure(
+                    scrollregion=canvas.bbox("all")
+                )
+            )
+            
+            canvas.create_window((0, 0), window=scrollable_frame, anchor='nw')
+            canvas.configure(yscrollcommand=scrollbar.set)
+            
+            canvas.pack(side='left', fill='both', expand=True)
+            scrollbar.pack(side='right', fill='y')
+            
+            # Obtener y mostrar estado de libros
+            try:
+                libros = obtener_estatus_libros()
+                if not libros:
+                    tk.Label(scrollable_frame, text="No hay libros registrados", 
+                            bg='white', font=('Arial', 12)).pack(pady=20)
+                else:
+                    tk.Label(scrollable_frame, text="ESTADO DE LIBROS", 
+                            bg='white', font=('Arial', 14, 'bold')).pack(pady=10)
+                    
+                    # Encabezados
+                    frame_header = tk.Frame(scrollable_frame, bg='#e0e0e0', bd=1, relief='groove')
+                    frame_header.pack(fill='x', pady=(0,5), padx=10)
+                    
+                    tk.Label(frame_header, text="ID", width=8, anchor='w', 
+                            bg='#e0e0e0', font=('Arial', 10, 'bold')).pack(side='left', padx=5)
+                    tk.Label(frame_header, text="ESTADO", width=15, anchor='w', 
+                            bg='#e0e0e0', font=('Arial', 10, 'bold')).pack(side='left', padx=5)
+                    
+                    # Datos
+                    for libro in libros:
+                        estado = "DISPONIBLE" if libro[1] else "PRESTADO"
+                        color = '#d4edda' if libro[1] else '#f8d7da'
+                        
+                        frame_libro = tk.Frame(scrollable_frame, bg=color, bd=1, relief='groove')
+                        frame_libro.pack(fill='x', pady=1, padx=10)
+                        
+                        tk.Label(frame_libro, text=f"{libro[0]}", width=8, anchor='w', 
+                                bg=color, font=('Arial', 10)).pack(side='left', padx=5)
+                        tk.Label(frame_libro, text=estado, width=15, anchor='w', 
+                                bg=color, font=('Arial', 10)).pack(side='left', padx=5)
+                        
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudieron cargar los libros:\n{str(e)}")
+
+        def cargar_estadisticas():
+            # Limpiar frame y figuras anteriores
+            for widget in frame_stats.winfo_children():
+                widget.destroy()
+            
+            for fig in figuras:
+                plt.close(fig)
+            figuras.clear()
+            
+            try:
+                from estadisticas import obtener_estadisticas
+                stats = obtener_estadisticas()
+                
+                # Frame con scroll
+                canvas = tk.Canvas(frame_stats, bg='white')
+                scrollbar = tk.Scrollbar(frame_stats, orient='vertical', command=canvas.yview)
+                scrollable_frame = tk.Frame(canvas, bg='white')
+                
+                scrollable_frame.bind(
+                    "<Configure>",
+                    lambda e: canvas.configure(
+                        scrollregion=canvas.bbox("all")
+                    )
+                )
+                
+                canvas.create_window((0, 0), window=scrollable_frame, anchor='nw')
+                canvas.configure(yscrollcommand=scrollbar.set)
+                
+                canvas.pack(side='left', fill='both', expand=True)
+                scrollbar.pack(side='right', fill='y')
+                
+                # Título
+                tk.Label(scrollable_frame, text="ESTADÍSTICAS GENERALES", 
+                        bg='white', font=('Arial', 14, 'bold')).pack(pady=10)
+                
+                # Gráfica de libros más prestados
+                if stats['libros_mas_prestados']:
+                    fig_libros = plt.Figure(figsize=(8, 4), dpi=100, facecolor='#f8f9fa')
+                    ax_libros = fig_libros.add_subplot(111)
+                    
+                    libros = [x[1][:15] + '...' if len(x[1]) > 15 else x[1] for x in stats['libros_mas_prestados']]
+                    prestamos = [x[2] for x in stats['libros_mas_prestados']]
+                    
+                    bars = ax_libros.bar(libros, prestamos, color='#007bff')
+                    ax_libros.set_title('Libros más prestados', pad=20)
+                    ax_libros.set_ylabel('Número de préstamos')
+                    ax_libros.tick_params(axis='x', rotation=45)
+                    
+                    # Añadir valores en las barras
+                    for bar in bars:
+                        height = bar.get_height()
+                        ax_libros.text(bar.get_x() + bar.get_width()/2., height,
+                                    f'{int(height)}', ha='center', va='bottom')
+                    
+                    fig_libros.tight_layout()
+                    
+                    canvas_libros = FigureCanvasTkAgg(fig_libros, master=scrollable_frame)
+                    canvas_libros.draw()
+                    canvas_libros.get_tk_widget().pack(fill='x', padx=10, pady=5)
+                    figuras.append(fig_libros)
+                
+                # Gráfica de usuarios más activos
+                if stats['usuarios_activos']:
+                    fig_usuarios = plt.Figure(figsize=(8, 4), dpi=100, facecolor='#f8f9fa')
+                    ax_usuarios = fig_usuarios.add_subplot(111)
+                    
+                    usuarios = [x[1][:15] + '...' if len(x[1]) > 15 else x[1] for x in stats['usuarios_activos']]
+                    transacciones = [x[2] for x in stats['usuarios_activos']]
+                    
+                    bars = ax_usuarios.barh(usuarios, transacciones, color='#28a745')
+                    ax_usuarios.set_title('Usuarios más activos', pad=20)
+                    ax_usuarios.set_xlabel('Número de transacciones')
+                    
+                    # Añadir valores en las barras
+                    for bar in bars:
+                        width = bar.get_width()
+                        ax_usuarios.text(width, bar.get_y() + bar.get_height()/2.,
+                                    f'{int(width)}', ha='left', va='center')
+                    
+                    fig_usuarios.tight_layout()
+                    
+                    canvas_usuarios = FigureCanvasTkAgg(fig_usuarios, master=scrollable_frame)
+                    canvas_usuarios.draw()
+                    canvas_usuarios.get_tk_widget().pack(fill='x', padx=10, pady=5)
+                    figuras.append(fig_usuarios)
+                
+                # Mostrar porcentaje de disponibilidad
+                frame_disponible = tk.Frame(scrollable_frame, bg='#fff3cd', bd=1, relief='groove')
+                frame_disponible.pack(fill='x', padx=10, pady=10)
+                
+                tk.Label(frame_disponible, 
+                        text=f"Tasa de disponibilidad general: {stats['porcentaje_disponible']}%",
+                        bg='#fff3cd', font=('Arial', 12, 'bold')).pack(pady=10)
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"No se pudieron cargar las estadísticas:\n{str(e)}")
         
-        scrollbar = tk.Scrollbar(lista_frame)
-        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        # Mostrar primera pestaña por defecto
+        mostrar_pestana(0)
         
-        lista_estatus = tk.Listbox(lista_frame, yscrollcommand=scrollbar.set, width=80)
-        for libro in obtener_estatus_libros():
-            estado = "Disponible" if libro[1] else "Prestado"
-            lista_estatus.insert(tk.END, f"Libro ID: {libro[0]} - Estado: {estado}")
-        lista_estatus.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        scrollbar.config(command=lista_estatus.yview)
 
 def ejecutar_app():
     root = tk.Tk()
